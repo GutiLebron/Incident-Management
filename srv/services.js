@@ -1,23 +1,34 @@
-const cds = require('@sap/cds')
+const cds = require('@sap/cds');
 
 class ProcessorService extends cds.ApplicationService {
   /** Registering custom event handlers */
-  init() {
-    this.before("UPDATE", "Incidents", (req) => this.onUpdate(req));
-    this.before("CREATE", "Incidents", (req) => this.changeUrgencyDueToSubject(req.data));
+  async init() {
+    // Lógica de negocio sobre Incidents
+    this.before('UPDATE', 'Incidents', req => this.onUpdate(req));
+    this.before('CREATE', 'Incidents', req => this.changeUrgencyDueToSubject(req));
+
+    // Ya no necesitamos conectar ni interceptar Customers:
+    // - La lectura de Customers la hace CAP vía RemoteService.RemoteCustomers
+    // - El JOIN y el email están definidos en remote.cds / ProcessorService.cds
 
     return super.init();
   }
 
-  changeUrgencyDueToSubject(data) {
-    let urgent = data.title?.match(/urgent/i)
-    if (urgent) data.urgency_code = 'H'
+  changeUrgencyDueToSubject(req) {
+    if (req.data.title?.toLowerCase().includes('urgent')) {
+      req.data.urgency_code = 'H';
+    }
   }
 
-  /** Custom Validation */
-  async onUpdate (req) {
-    let closed = await SELECT.one(1) .from (req.subject) .where `status.code = 'C'`
-    if (closed) req.reject `Can't modify a closed incident!`
+  async onUpdate(req) {
+    const { status_code } = await SELECT
+      .one(req.subject, i => i.status_code)
+      .where({ ID: req.data.ID });
+
+    if (status_code === 'C') {
+      return req.reject(400, `Can't modify a closed incident`);
+    }
   }
 }
-module.exports = { ProcessorService }
+
+module.exports = { ProcessorService };
