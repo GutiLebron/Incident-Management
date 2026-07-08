@@ -26,6 +26,9 @@
       }
     }
   },
+  "sap.cloud": {
+    "service": "incident-management"
+  },
   "sap.ui": {
     "technology": "UI5",
     "icons": {
